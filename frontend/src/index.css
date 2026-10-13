@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Inter', system-ui, sans-serif;
+}
+
+/*
+ * Base (neutral) tokens. The brand/accent color itself is driven by the
+ * `data-theme` attribute on <html>, set via ThemeProvider (see
+ * src/context/theme-context.tsx) and chosen by the user on the Settings
+ * page. This keeps every component (buttons, active nav, charts, badges)
+ * in sync with a single source of truth instead of hardcoded colors.
+ */
+:root {
+  --radius: 0.75rem;
+
+  --background: #f8f9fa;
+  --foreground: #1e293b;
+
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+}
+
+/* ---- Brand themes ---- */
+:root,
+:root[data-theme='emerald'] {
+  --brand: #059669;
+  --brand-dark: #065f46;
+  --brand-mid: #10b981;
+  --brand-soft: #ecfdf5;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #064e3b 0%, #059669 55%, #10b981 100%);
+}
+:root[data-theme='indigo'] {
+  --brand: #4f46e5;
+  --brand-dark: #3730a3;
+  --brand-mid: #6366f1;
+  --brand-soft: #eef2ff;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #1e1b4b 0%, #4338ca 55%, #6366f1 100%);
+}
+:root[data-theme='teal-cyan'] {
+  --brand: #0d9488;
+  --brand-dark: #115e59;
+  --brand-mid: #14b8a6;
+  --brand-soft: #ecfeff;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #083344 0%, #0891b2 55%, #22d3ee 100%);
+}
+:root[data-theme='navy-gold'] {
+  --brand: #b45309;
+  --brand-dark: #1e293b;
+  --brand-mid: #d97706;
+  --brand-soft: #fffbeb;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #334155 100%);
+}
+:root[data-theme='sunset'] {
+  --brand: #ea580c;
+  --brand-dark: #9a3412;
+  --brand-mid: #f97316;
+  --brand-soft: #fff7ed;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #7c2d12 0%, #ea580c 55%, #fb923c 100%);
+}
+:root[data-theme='royal-purple'] {
+  --brand: #7e22ce;
+  --brand-dark: #4c1d95;
+  --brand-mid: #a855f7;
+  --brand-soft: #faf5ff;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #2e1065 0%, #7e22ce 55%, #c084fc 100%);
+}
+:root[data-theme='forest'] {
+  --brand: #15803d;
+  --brand-dark: #14532d;
+  --brand-mid: #22c55e;
+  --brand-soft: #f0fdf4;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #052e16 0%, #15803d 55%, #4ade80 100%);
+}
+:root[data-theme='cobalt'] {
+  --brand: #1d4ed8;
+  --brand-dark: #1e3a8a;
+  --brand-mid: #3b82f6;
+  --brand-soft: #eff6ff;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #0b1f52 0%, #1d4ed8 55%, #60a5fa 100%);
+}
+:root[data-theme='crimson'] {
+  --brand: #be123c;
+  --brand-dark: #881337;
+  --brand-mid: #e11d48;
+  --brand-soft: #fff1f2;
+  --brand-foreground: #ffffff;
+  --brand-grad: linear-gradient(135deg, #4c0519 0%, #be123c 55%, #fb7185 100%);
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-foreground: #e2e8f0;
+  --popover: #1e293b;
+  --popover-foreground: #e2e8f0;
+  --secondary: #334155;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --destructive: #ef4444;
+  --destructive-foreground: #0f172a;
+  --border: #334155;
+  --input: #334155;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--brand-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--brand-soft);
+  --color-accent-foreground: var(--brand-dark);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Convenience utility classes for brand-driven visuals (sparklines, hero
+   gradients, progress bars) that go beyond what the shadcn token mapping
+   above covers. */
+.brand-bg {
+  background: var(--brand);
+}
+.brand-text {
+  color: var(--brand);
+}
+.brand-soft-bg {
+  background: var(--brand-soft);
+}
+.brand-gradient {
+  background: var(--brand-grad);
+}
+.brand-spark {
+  background: linear-gradient(180deg, var(--brand-mid), var(--brand));
+}
+.progress-track {
+  background: var(--muted);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

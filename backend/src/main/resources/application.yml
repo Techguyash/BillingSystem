@@ -1,0 +1,32 @@
+server:
+  port: ${PORT:3000}
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:billing_dev}
+    username: ${DB_USERNAME:ashiq}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  jackson:
+    default-property-inclusion: non_null
+
+app:
+  jwt:
+    access-secret: ${JWT_ACCESS_SECRET:dev-access-secret-change-me-please-0123456789}
+    access-expires-minutes: ${JWT_ACCESS_EXPIRES_MIN:15}
+    refresh-secret: ${JWT_REFRESH_SECRET:dev-refresh-secret-change-me-please-0123456789}
+    refresh-expires-days: ${JWT_REFRESH_EXPIRES_DAYS:7}
+  cors:
+    allowed-origin: ${CORS_ORIGIN:http://localhost:5173}
+  seed:
+    business-name: ${SEED_BUSINESS_NAME:Acme Retail}
+    admin-username: ${SEED_ADMIN_USERNAME:admin}
+    admin-password: ${SEED_ADMIN_PASSWORD:admin}
