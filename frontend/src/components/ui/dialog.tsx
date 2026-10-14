@@ -56,7 +56,13 @@ function DialogContent({
           // taller than the viewport overflows off-screen with no way to
           // scroll down to reach the submit button — a hard usability
           // blocker, not just a cosmetic issue.
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[85vh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Default bumped from sm:max-w-sm (384px) to sm:max-w-lg (512px) —
+          // most of our dialogs are forms with several side-by-side fields
+          // (phone/email/address/state, etc.) that felt cramped at the
+          // shadcn default. Dialogs with denser content (detail views,
+          // line-item builders) override this further with their own
+          // className.
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[85vh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

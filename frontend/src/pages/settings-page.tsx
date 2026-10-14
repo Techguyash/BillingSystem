@@ -24,6 +24,9 @@ import {
   type UpdateBusinessPayload,
 } from '@/types/business'
 import { CustomFieldsCard } from '@/components/settings/custom-fields-card'
+import { UnitsCard } from '@/components/settings/units-card'
+import { DiscountsCard } from '@/components/settings/discounts-card'
+import { TaxRatesCard } from '@/components/settings/tax-rates-card'
 
 export function SettingsPage() {
   const { themeId, setThemeId } = useTheme()
@@ -87,6 +90,9 @@ export function SettingsPage() {
       <BusinessProfileCard />
       <ModulesCard />
       <InvoiceCustomizationCard />
+      <UnitsCard />
+      <DiscountsCard />
+      <TaxRatesCard />
       <CustomFieldsCard />
     </div>
   )

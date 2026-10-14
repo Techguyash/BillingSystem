@@ -257,13 +257,14 @@ function UsersTab() {
                     </span>
                   </TableCell>
                   <TableCell className="pr-6 text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
+                    <Button variant="ghost" size="icon" title="Edit user" onClick={() => openEdit(user)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     {user.isActive && (
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Deactivate user"
                         onClick={() => setDeactivateTarget(user)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -505,12 +506,13 @@ function RolesTab() {
                   <TableCell className="pr-6 text-right">
                     {!role.isSystem && (
                       <>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
+                        <Button variant="ghost" size="icon" title="Edit role" onClick={() => openEdit(role)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Delete role"
                           onClick={() => setDeleteTarget(role)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -526,7 +528,7 @@ function RolesTab() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Role' : 'New Role'}</DialogTitle>
           </DialogHeader>
@@ -541,7 +543,7 @@ function RolesTab() {
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="max-h-72 space-y-4 overflow-y-auto pr-1">
+            <div className="grid max-h-[32rem] grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto pr-1 sm:grid-cols-2">
               {PERMISSION_GROUPS.map((group) => (
                 <div key={group.label} className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

@@ -1,5 +1,6 @@
 package com.billingsystem.supplier.dto;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import lombok.Data;
 
@@ -11,6 +12,7 @@ public class UpdateSupplierRequest {
   private String address;
   private String gstin;
   private String state;
+  private BigDecimal openingBalance;
   private Boolean isActive;
   private Map<String, Object> customFields;
 }

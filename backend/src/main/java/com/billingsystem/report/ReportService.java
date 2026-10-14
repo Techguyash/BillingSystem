@@ -6,6 +6,7 @@ import com.billingsystem.invoice.Invoice;
 import com.billingsystem.invoice.InvoiceItem;
 import com.billingsystem.invoice.InvoiceRepository;
 import com.billingsystem.invoice.Payment;
+import com.billingsystem.returns.CreditNote;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -58,19 +59,28 @@ public class ReportService {
     }
 
     for (Invoice invoice : invoices) {
-      totalSales = totalSales.add(invoice.getTotalAmount());
+      // Net of returns — a refunded sale shouldn't keep inflating revenue
+      // as if the customer still has the goods.
+      BigDecimal netAmount = invoice.getTotalAmount().subtract(returnedTotal(invoice));
+      totalSales = totalSales.add(netAmount);
       totalTax = totalTax.add(invoice.getTaxTotal());
       totalDiscount = totalDiscount.add(invoice.getDiscountTotal());
 
       String day = invoice.getCreatedAt().atZone(ZONE).toLocalDate().format(DAY_FORMAT);
       DailyPoint point = byDay.get(day);
       if (point != null) {
-        byDay.put(day, point.plus(invoice.getTotalAmount()));
+        byDay.put(day, point.plus(netAmount));
       }
     }
 
     return new SalesSummary(
         totalSales, totalTax, totalDiscount, invoices.size(), new ArrayList<>(byDay.values()));
+  }
+
+  private static BigDecimal returnedTotal(Invoice invoice) {
+    return invoice.getCreditNotes().stream()
+        .map(CreditNote::getTotalAmount)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   public GstSummary gstSummary(UUID businessId, LocalDate from, LocalDate to) {

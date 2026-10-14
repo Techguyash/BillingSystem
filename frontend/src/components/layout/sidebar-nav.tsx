@@ -11,6 +11,9 @@ import {
   BarChart3,
   Settings,
   UserCog,
+  Wallet,
+  ClipboardList,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -37,6 +40,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Operations',
     items: [
       { to: '/billing', label: 'Billing / POS', icon: Receipt, moduleKey: 'billing' },
+      { to: '/quotations', label: 'Quotations', icon: ClipboardList, permission: 'quotation.view' },
       { to: '/invoices', label: 'Invoices', icon: FileText, moduleKey: 'invoices' },
       { to: '/inventory', label: 'Inventory', icon: Package, moduleKey: 'inventory' },
       { to: '/purchases', label: 'Purchases', icon: ShoppingCart, moduleKey: 'purchases' },
@@ -46,12 +50,22 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Insights',
-    items: [{ to: '/reports', label: 'Reports', icon: BarChart3, moduleKey: 'reports' }],
+    items: [
+      {
+        to: '/reports',
+        label: 'Reports',
+        icon: BarChart3,
+        moduleKey: 'reports',
+        permission: 'reports.view',
+      },
+      { to: '/expenses', label: 'Expenses', icon: Wallet, permission: 'expense.manage' },
+    ],
   },
   {
     label: 'Administration',
     items: [
       { to: '/team', label: 'Team', icon: UserCog, permission: 'user.manage' },
+      { to: '/audit-log', label: 'Audit Log', icon: History, permission: 'audit_log.view' },
       { to: '/settings', label: 'Settings', icon: Settings },
     ],
   },

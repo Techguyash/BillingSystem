@@ -22,6 +22,14 @@ export interface Payment {
   createdAt: string
 }
 
+export interface InvoiceCreditNote {
+  id: string
+  creditNoteNumber: string
+  reason: string | null
+  totalAmount: string
+  createdAt: string
+}
+
 export interface Invoice {
   id: string
   invoiceNumber: string
@@ -33,10 +41,13 @@ export interface Invoice {
   subtotal: string
   taxTotal: string
   discountTotal: string
+  discountId: string | null
+  discountName: string | null
   totalAmount: string
   notes: string | null
   items: InvoiceItem[]
   payments: Payment[]
+  creditNotes: InvoiceCreditNote[]
   createdAt: string
 }
 
@@ -45,6 +56,7 @@ export interface CreateInvoicePayload {
   items: { productId: string; quantity: number; unitPrice?: number }[]
   paymentMethod?: PaymentMethod
   discountTotal?: number
+  discountId?: string
   notes?: string
 }
 
@@ -54,7 +66,13 @@ export interface RecordPaymentPayload {
   notes?: string
 }
 
+/** Net of any returns — a refunded amount is no longer owed, same logic the backend applies. */
+export function getReturnedTotal(invoice: Invoice): number {
+  return invoice.creditNotes.reduce((sum, cn) => sum + Number(cn.totalAmount), 0)
+}
+
 export function getBalanceDue(invoice: Invoice): number {
   const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0)
-  return Math.max(Number(invoice.totalAmount) - paid, 0)
+  const effectiveOwed = Math.max(Number(invoice.totalAmount) - getReturnedTotal(invoice), 0)
+  return Math.max(effectiveOwed - paid, 0)
 }

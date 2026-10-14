@@ -18,20 +18,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('reports.view')")
 public class ReportController {
 
   private final InvoiceService invoiceService;
   private final ProductService productService;
   private final ReportService reportService;
 
+  // summary/sales/payment-methods/low-stock are deliberately NOT gated by
+  // reports.view — they feed the Dashboard, which is the home page every
+  // role lands on (including a plain Cashier). Only the deeper BI endpoints
+  // below (top-products, gst) are reserved for roles with report access,
+  // matching the default Cashier role's permission set.
   @GetMapping("/summary")
   public Summary summary() {
     var businessId = CurrentUser.get().getBusinessId();
     var today = invoiceService.getTodaySummary(businessId);
     long productsInStock = productService.countInStock(businessId);
     long lowStockCount = productService.countLowStock(businessId);
-    return new Summary(today.totalSales(), today.invoiceCount(), productsInStock, lowStockCount);
+    var totalOutstanding = invoiceService.getTotalOutstanding(businessId);
+    return new Summary(
+        today.totalSales(), today.invoiceCount(), productsInStock, lowStockCount, totalOutstanding);
   }
 
   @GetMapping("/sales")
@@ -51,6 +57,7 @@ public class ReportController {
     return reportService.gstSummary(CurrentUser.get().getBusinessId(), range.from(), range.to());
   }
 
+  @PreAuthorize("hasAuthority('reports.view')")
   @GetMapping("/top-products")
   public List<ReportService.ProductSales> topProducts(
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -84,5 +91,9 @@ public class ReportController {
   private record DateRange(LocalDate from, LocalDate to) {}
 
   public record Summary(
-      BigDecimal todaySales, int todayInvoiceCount, long productsInStock, long lowStockCount) {}
+      BigDecimal todaySales,
+      int todayInvoiceCount,
+      long productsInStock,
+      long lowStockCount,
+      BigDecimal totalOutstanding) {}
 }

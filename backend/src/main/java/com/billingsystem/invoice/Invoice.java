@@ -3,6 +3,7 @@ package com.billingsystem.invoice;
 import com.billingsystem.branch.Branch;
 import com.billingsystem.common.TenantBaseEntity;
 import com.billingsystem.customer.Customer;
+import com.billingsystem.returns.CreditNote;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -66,6 +67,14 @@ public class Invoice extends TenantBaseEntity {
   @Column(name = "discount_total", precision = 12, scale = 2, nullable = false)
   private BigDecimal discountTotal = BigDecimal.ZERO;
 
+  /** Set when the discount was applied via a named preset (see DiscountService) rather than typed in manually. */
+  @Column(name = "discount_id")
+  private UUID discountId;
+
+  /** Snapshot so receipts/reports still read sensibly if the preset is later renamed or deleted. */
+  @Column(name = "discount_name")
+  private String discountName;
+
   @Column(name = "total_amount", precision = 12, scale = 2, nullable = false)
   private BigDecimal totalAmount;
 
@@ -77,4 +86,8 @@ public class Invoice extends TenantBaseEntity {
 
   @OneToMany(mappedBy = "invoice", fetch = FetchType.EAGER)
   private List<Payment> payments = new ArrayList<>();
+
+  /** Sales returns issued against this invoice — see CreditNoteService. */
+  @OneToMany(mappedBy = "invoice", fetch = FetchType.EAGER)
+  private List<CreditNote> creditNotes = new ArrayList<>();
 }

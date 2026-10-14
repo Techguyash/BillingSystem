@@ -1,5 +1,6 @@
 package com.billingsystem.user;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.user.dto.CreateUserRequest;
 import com.billingsystem.user.dto.UpdateUserRequest;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
   private final UserService userService;
+  private final AuditLogService auditLogService;
 
   @GetMapping
   public List<User> findAll() {
@@ -32,18 +34,30 @@ public class UserController {
 
   @PostMapping
   public User create(@Valid @RequestBody CreateUserRequest dto) {
-    return userService.createTeammate(CurrentUser.get().getBusinessId(), dto);
+    var currentUser = CurrentUser.get();
+    User created = userService.createTeammate(currentUser.getBusinessId(), dto);
+    auditLogService.record(
+        currentUser.getBusinessId(), currentUser.getUserId(), currentUser.getName(), "user.create", "User",
+        created.getId(), "Created user \"" + created.getName() + "\" (" + created.getEmail() + ")");
+    return created;
   }
 
   @PatchMapping("/{id}")
   public User update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest dto) {
     var currentUser = CurrentUser.get();
-    return userService.update(currentUser.getBusinessId(), id, currentUser.getUserId(), dto);
+    User updated = userService.update(currentUser.getBusinessId(), id, currentUser.getUserId(), dto);
+    auditLogService.record(
+        currentUser.getBusinessId(), currentUser.getUserId(), currentUser.getName(), "user.update", "User",
+        updated.getId(), "Updated user \"" + updated.getName() + "\"");
+    return updated;
   }
 
   @DeleteMapping("/{id}")
   public void remove(@PathVariable UUID id) {
     var currentUser = CurrentUser.get();
     userService.deactivate(currentUser.getBusinessId(), id, currentUser.getUserId());
+    auditLogService.record(
+        currentUser.getBusinessId(), currentUser.getUserId(), currentUser.getName(), "user.deactivate", "User", id,
+        "Deactivated a user");
   }
 }

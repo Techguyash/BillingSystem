@@ -56,7 +56,7 @@ public class AuthService {
     return issueTokens(toAuthenticatedUser(user));
   }
 
-  private AuthenticatedUser toAuthenticatedUser(User user) {
+  public AuthenticatedUser toAuthenticatedUser(User user) {
     return new AuthenticatedUser(
         user.getId(),
         user.getBusinessId(),

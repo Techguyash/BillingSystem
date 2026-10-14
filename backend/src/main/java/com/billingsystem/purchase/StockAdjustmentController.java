@@ -1,5 +1,6 @@
 package com.billingsystem.purchase;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.purchase.dto.CreateStockAdjustmentRequest;
 import jakarta.validation.Valid;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class StockAdjustmentController {
 
   private final StockAdjustmentService stockAdjustmentService;
+  private final AuditLogService auditLogService;
 
   @GetMapping
   public List<StockAdjustment> findAll() {
@@ -28,6 +30,12 @@ public class StockAdjustmentController {
   @PostMapping
   public StockAdjustment create(@Valid @RequestBody CreateStockAdjustmentRequest dto) {
     var user = CurrentUser.get();
-    return stockAdjustmentService.create(user.getBusinessId(), user.getUserId(), dto);
+    StockAdjustment adjustment = stockAdjustmentService.create(user.getBusinessId(), user.getUserId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "inventory.adjust_stock", "Product",
+        adjustment.getProductId(),
+        "Adjusted stock of \"" + adjustment.getProductName() + "\" by " + adjustment.getQuantityDelta()
+            + " (" + adjustment.getReason() + ")");
+    return adjustment;
   }
 }

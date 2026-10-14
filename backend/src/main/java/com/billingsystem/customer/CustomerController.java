@@ -1,8 +1,11 @@
 package com.billingsystem.customer;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.customer.dto.CustomerRequest;
 import com.billingsystem.customer.dto.UpdateCustomerRequest;
+import com.billingsystem.ledger.LedgerEntry;
+import com.billingsystem.ledger.LedgerService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class CustomerController {
 
   private final CustomerService customerService;
+  private final LedgerService ledgerService;
+  private final AuditLogService auditLogService;
 
   @GetMapping
   public List<Customer> findAll(@RequestParam(required = false) String search) {
@@ -36,18 +41,38 @@ public class CustomerController {
     return customerService.findOne(CurrentUser.get().getBusinessId(), id);
   }
 
+  @GetMapping("/{id}/ledger")
+  public List<LedgerEntry> ledger(@PathVariable UUID id) {
+    return ledgerService.customerLedger(CurrentUser.get().getBusinessId(), id);
+  }
+
   @PostMapping
   public Customer create(@Valid @RequestBody CustomerRequest dto) {
-    return customerService.create(CurrentUser.get().getBusinessId(), dto);
+    var user = CurrentUser.get();
+    Customer customer = customerService.create(user.getBusinessId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "customer.create", "Customer", customer.getId(),
+        "Created customer \"" + customer.getName() + "\"");
+    return customer;
   }
 
   @PatchMapping("/{id}")
   public Customer update(@PathVariable UUID id, @Valid @RequestBody UpdateCustomerRequest dto) {
-    return customerService.update(CurrentUser.get().getBusinessId(), id, dto);
+    var user = CurrentUser.get();
+    Customer customer = customerService.update(user.getBusinessId(), id, dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "customer.update", "Customer", customer.getId(),
+        "Updated customer \"" + customer.getName() + "\"");
+    return customer;
   }
 
   @DeleteMapping("/{id}")
   public void remove(@PathVariable UUID id) {
-    customerService.remove(CurrentUser.get().getBusinessId(), id);
+    var user = CurrentUser.get();
+    Customer customer = customerService.findOne(user.getBusinessId(), id);
+    customerService.remove(user.getBusinessId(), id);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "customer.deactivate", "Customer", id,
+        "Deactivated customer \"" + customer.getName() + "\"");
   }
 }

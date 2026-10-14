@@ -20,5 +20,6 @@ export interface CustomerFormValues {
   address?: string
   gstin?: string
   state?: string
+  openingBalance?: number
   customFields?: Record<string, unknown>
 }

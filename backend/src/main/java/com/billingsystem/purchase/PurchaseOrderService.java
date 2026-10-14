@@ -4,6 +4,8 @@ import com.billingsystem.product.Product;
 import com.billingsystem.product.ProductRepository;
 import com.billingsystem.purchase.dto.CreatePurchaseItemRequest;
 import com.billingsystem.purchase.dto.CreatePurchaseOrderRequest;
+import com.billingsystem.purchase.dto.RecordSupplierPaymentRequest;
+import com.billingsystem.returns.DebitNote;
 import com.billingsystem.supplier.SupplierRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
@@ -19,10 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PurchaseOrderService {
 
   private static final BigDecimal HUNDRED = new BigDecimal("100");
+  private static final BigDecimal PAID_EPSILON = new BigDecimal("0.01");
 
   private final PurchaseOrderRepository purchaseOrderRepository;
   private final ProductRepository productRepository;
   private final SupplierRepository supplierRepository;
+  private final SupplierPaymentRepository supplierPaymentRepository;
 
   public List<PurchaseOrder> findAll(UUID businessId) {
     return purchaseOrderRepository.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
@@ -62,6 +66,10 @@ public class PurchaseOrderService {
                   () ->
                       new IllegalArgumentException(
                           "Product " + line.getProductId() + " not found"));
+      if (product.isComposite()) {
+        throw new IllegalArgumentException(
+            "\"" + product.getName() + "\" is a bundle — purchase its individual components instead");
+      }
 
       BigDecimal taxRatePercent =
           line.getTaxRatePercent() != null ? line.getTaxRatePercent() : product.getTaxRatePercent();
@@ -99,5 +107,48 @@ public class PurchaseOrderService {
     purchase.setTotalAmount(subtotal.add(taxTotal));
 
     return purchaseOrderRepository.save(purchase);
+  }
+
+  @Transactional
+  public PurchaseOrder recordPayment(
+      UUID businessId, UUID purchaseOrderId, UUID userId, RecordSupplierPaymentRequest dto) {
+    PurchaseOrder purchase = findOne(businessId, purchaseOrderId);
+    if (purchase.getSupplierId() == null) {
+      throw new IllegalArgumentException("This purchase has no supplier to pay");
+    }
+
+    BigDecimal alreadyPaid =
+        purchase.getPayments().stream()
+            .map(SupplierPayment::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal balanceDue = getEffectiveAmountOwed(purchase).subtract(alreadyPaid);
+
+    if (dto.getAmount().compareTo(balanceDue.add(PAID_EPSILON)) > 0) {
+      throw new IllegalArgumentException(
+          "Payment of "
+              + dto.getAmount()
+              + " exceeds the remaining balance of "
+              + balanceDue.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    SupplierPayment payment = new SupplierPayment();
+    payment.setBusinessId(businessId);
+    payment.setPurchaseOrderId(purchaseOrderId);
+    payment.setSupplierId(purchase.getSupplierId());
+    payment.setAmount(dto.getAmount());
+    payment.setMethod(dto.getMethod());
+    payment.setPaidByUserId(userId);
+    payment.setNotes(dto.getNotes());
+    supplierPaymentRepository.save(payment);
+    purchase.getPayments().add(payment);
+
+    return purchase;
+  }
+
+  /** What's actually owed to the supplier net of returns — total minus every debit note issued against this purchase. */
+  private BigDecimal getEffectiveAmountOwed(PurchaseOrder purchase) {
+    BigDecimal returned =
+        purchase.getDebitNotes().stream().map(DebitNote::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    return purchase.getTotalAmount().subtract(returned).max(BigDecimal.ZERO);
   }
 }

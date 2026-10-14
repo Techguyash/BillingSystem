@@ -1,7 +1,9 @@
 package com.billingsystem.product.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 
@@ -30,5 +32,10 @@ public class UpdateProductRequest {
   private BigDecimal reorderLevel;
 
   private Boolean isActive;
+  private Boolean isComposite;
+
+  @Valid
+  private List<ProductComponentRequest> components;
+
   private Map<String, Object> customFields;
 }

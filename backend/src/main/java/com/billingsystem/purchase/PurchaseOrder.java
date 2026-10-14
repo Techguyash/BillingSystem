@@ -1,6 +1,7 @@
 package com.billingsystem.purchase;
 
 import com.billingsystem.common.TenantBaseEntity;
+import com.billingsystem.returns.DebitNote;
 import com.billingsystem.supplier.Supplier;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -61,4 +62,11 @@ public class PurchaseOrder extends TenantBaseEntity {
 
   @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
   private List<PurchaseOrderItem> items = new ArrayList<>();
+
+  @OneToMany(mappedBy = "purchaseOrder", fetch = FetchType.EAGER)
+  private List<SupplierPayment> payments = new ArrayList<>();
+
+  /** Purchase returns issued against this purchase order — see DebitNoteService. */
+  @OneToMany(mappedBy = "purchaseOrder", fetch = FetchType.EAGER)
+  private List<DebitNote> debitNotes = new ArrayList<>();
 }

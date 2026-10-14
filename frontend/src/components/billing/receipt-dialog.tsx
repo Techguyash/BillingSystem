@@ -84,7 +84,11 @@ function buildReceiptHtml(invoice: Invoice, business?: Business) {
         <div class="totals">
           <div><span>Subtotal</span><span>₹${Number(invoice.subtotal).toFixed(2)}</span></div>
           ${taxRows}
-          ${Number(invoice.discountTotal) > 0 ? `<div><span>Discount</span><span>-₹${Number(invoice.discountTotal).toFixed(2)}</span></div>` : ''}
+          ${
+            Number(invoice.discountTotal) > 0
+              ? `<div><span>Discount${invoice.discountName ? ` (${invoice.discountName})` : ''}</span><span>-₹${Number(invoice.discountTotal).toFixed(2)}</span></div>`
+              : ''
+          }
           <div class="grand"><span>Total</span><span>₹${Number(invoice.totalAmount).toFixed(2)}</span></div>
           ${balanceDue > 0 ? `<div class="due"><span>Balance Due</span><span>₹${balanceDue.toFixed(2)}</span></div>` : ''}
         </div>

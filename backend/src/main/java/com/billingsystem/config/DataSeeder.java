@@ -6,6 +6,8 @@ import com.billingsystem.business.Business;
 import com.billingsystem.business.BusinessService;
 import com.billingsystem.role.Role;
 import com.billingsystem.role.RoleService;
+import com.billingsystem.taxrate.TaxRateService;
+import com.billingsystem.unit.UnitService;
 import com.billingsystem.user.User;
 import com.billingsystem.user.UserService;
 import java.util.List;
@@ -31,13 +33,29 @@ public class DataSeeder implements CommandLineRunner {
   private final BranchService branchService;
   private final RoleService roleService;
   private final UserService userService;
+  private final UnitService unitService;
+  private final TaxRateService taxRateService;
   private final PasswordEncoder passwordEncoder;
   private final SeedProperties seedProperties;
 
   @Override
   public void run(String... args) {
-    if (businessService.findFirst() != null) {
+    Business existing = businessService.findFirst();
+    if (existing != null) {
       log.info("Business already exists. Seed skipped.");
+      // Still backfill default units for installs that existed before the
+      // Units feature was added — idempotent, harmless to call every boot.
+      if (unitService.findAll(existing.getId()).isEmpty()) {
+        unitService.seedDefaults(existing.getId());
+        log.info("Backfilled default units for existing business.");
+      }
+      if (taxRateService.findAll(existing.getId()).isEmpty()) {
+        taxRateService.seedDefaults(existing.getId());
+        log.info("Backfilled default tax rates for existing business.");
+      }
+      // Same idea: keep Owner/Manager/Cashier's stored permissions in sync
+      // with whatever Permissions.DEFAULT_ROLES defines in code today.
+      roleService.syncSystemRolePermissions(existing.getId());
       return;
     }
 
@@ -61,6 +79,9 @@ public class DataSeeder implements CommandLineRunner {
     branch.setName("Main Branch");
     branch.setDefault(true);
     branchService.create(branch);
+
+    unitService.seedDefaults(business.getId());
+    taxRateService.seedDefaults(business.getId());
 
     List<Role> roles = roleService.seedDefaultRoles(business.getId());
     Role ownerRole = roles.stream().filter(r -> r.getName().equals("Owner")).findFirst().orElseThrow();

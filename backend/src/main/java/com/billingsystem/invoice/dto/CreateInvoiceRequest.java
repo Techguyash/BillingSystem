@@ -24,5 +24,8 @@ public class CreateInvoiceRequest {
   @DecimalMin(value = "0", message = "discountTotal must not be less than 0")
   private BigDecimal discountTotal;
 
+  /** If set, the discount is computed/validated server-side from this preset — discountTotal above is ignored. */
+  private UUID discountId;
+
   private String notes;
 }

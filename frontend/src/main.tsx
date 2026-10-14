@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { AuthProvider } from '@/context/auth-context'
 import { ThemeProvider } from '@/context/theme-context'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,7 +23,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <App />
+            <TooltipProvider delay={300}>
+              <App />
+            </TooltipProvider>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

@@ -32,6 +32,10 @@ public class StockAdjustmentService {
             .findById(dto.getProductId())
             .filter(p -> p.getBusinessId().equals(businessId))
             .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+    if (product.isComposite()) {
+      throw new IllegalArgumentException(
+          "\"" + product.getName() + "\" is a bundle with no stock of its own — adjust its components instead");
+    }
 
     BigDecimal newStock = product.getStockQty().add(dto.getQuantityDelta());
     if (newStock.compareTo(BigDecimal.ZERO) < 0) {

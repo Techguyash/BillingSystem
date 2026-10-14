@@ -45,6 +45,26 @@ public class RoleService {
     return roleRepository.saveAll(roles);
   }
 
+  /**
+   * Existing installs have system roles (Owner/Manager/Cashier) whose
+   * `permissions` were snapshotted into the database at creation time —
+   * adding a new permission constant in code (e.g. a new feature's
+   * `expense.manage`) does NOT retroactively reach those stored rows. Users
+   * can't edit system roles themselves (see `update`/`remove` above), so
+   * without this, a business's own Owner could get silently locked out of
+   * every new feature forever. Runs every boot; a no-op once in sync.
+   */
+  public void syncSystemRolePermissions(UUID businessId) {
+    for (Role role : roleRepository.findByBusinessId(businessId)) {
+      if (!role.isSystem()) continue;
+      List<String> canonical = Permissions.DEFAULT_ROLES.get(role.getName());
+      if (canonical != null && !canonical.equals(role.getPermissions())) {
+        role.setPermissions(canonical);
+        roleRepository.save(role);
+      }
+    }
+  }
+
   public Role create(UUID businessId, RoleRequest dto) {
     validatePermissions(dto.getPermissions());
     roleRepository

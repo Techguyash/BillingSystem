@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, RotateCcw, Trash2, Wallet } from 'lucide-react'
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 import type { Product } from '@/types/product'
 import type { Supplier } from '@/types/supplier'
-import type {
-  CreatePurchaseOrderPayload,
-  PurchaseOrder,
+import {
+  getSupplierBalanceDue,
+  type CreatePurchaseOrderPayload,
+  type PurchaseOrder,
 } from '@/types/purchase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +38,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { CreateDebitNoteDialog } from '@/components/purchases/create-debit-note-dialog'
+import { PurchaseDetailDialog } from '@/components/purchases/purchase-detail-dialog'
+import { useAuth } from '@/context/auth-context'
 
 interface LineItem {
   productId: string
@@ -54,7 +58,13 @@ const EMPTY_LINE: LineItem = {
 
 export function PurchasesPage() {
   const queryClient = useQueryClient()
+  const { hasPermission } = useAuth()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [returnTarget, setReturnTarget] = useState<PurchaseOrder | null>(null)
+  const [paymentTarget, setPaymentTarget] = useState<PurchaseOrder | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [detailTargetId, setDetailTargetId] = useState<string | null>(null)
   const [supplierId, setSupplierId] = useState<string>('none')
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('')
   const [notes, setNotes] = useState('')
@@ -69,6 +79,8 @@ export function PurchasesPage() {
     queryKey: ['purchases'],
     queryFn: async () => (await api.get<PurchaseOrder[]>('/purchases')).data,
   })
+
+  const detailPurchase = purchases?.find((po) => po.id === detailTargetId) ?? null
 
   const { data: products } = useQuery({
     queryKey: ['products', 'purchase-form'],
@@ -117,6 +129,29 @@ export function PurchasesPage() {
     },
     onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to record purchase')),
   })
+
+  const recordPayment = useMutation({
+    mutationFn: ({ id, amount, method }: { id: string; amount: number; method: string }) =>
+      api.post(`/purchases/${id}/payments`, { amount, method }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      toast.success('Payment recorded')
+      setPaymentTarget(null)
+    },
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to record payment')),
+  })
+
+  function openPaymentDialog(po: PurchaseOrder) {
+    setPaymentTarget(po)
+    setPaymentAmount(getSupplierBalanceDue(po))
+    setPaymentMethod('cash')
+  }
+
+  function submitPayment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!paymentTarget || paymentAmount <= 0) return
+    recordPayment.mutate({ id: paymentTarget.id, amount: paymentAmount, method: paymentMethod })
+  }
 
   function openCreate() {
     setSupplierId('none')
@@ -207,33 +242,37 @@ export function PurchasesPage() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Items</TableHead>
-                <TableHead className="pr-6">Total</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Balance Due</TableHead>
+                <TableHead className="pr-6 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Loading...
                   </TableCell>
                 </TableRow>
               )}
               {isError && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-destructive">
+                  <TableCell colSpan={7} className="text-center text-destructive">
                     Failed to load purchases: {getErrorMessage(error, 'Something went wrong.')}
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && !isError && purchases?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No purchases yet. Record stock received from a supplier to get started.
                   </TableCell>
                 </TableRow>
               )}
-              {purchases?.map((po) => (
-                <TableRow key={po.id}>
+              {purchases?.map((po) => {
+                const balanceDue = getSupplierBalanceDue(po)
+                return (
+                <TableRow key={po.id} className="cursor-pointer" onClick={() => setDetailTargetId(po.id)}>
                   <TableCell className="pl-6 font-medium">
                     {po.purchaseNumber}
                   </TableCell>
@@ -244,18 +283,47 @@ export function PurchasesPage() {
                   <TableCell className="text-muted-foreground">
                     {po.items.length} item{po.items.length === 1 ? '' : 's'}
                   </TableCell>
-                  <TableCell className="pr-6 font-semibold">
+                  <TableCell className="font-semibold">
                     ₹{Number(po.totalAmount).toFixed(2)}
                   </TableCell>
+                  <TableCell>
+                    {balanceDue > 0 ? (
+                      <span className="font-semibold text-amber-600">₹{balanceDue.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="pr-6 text-right" onClick={(e) => e.stopPropagation()}>
+                    {balanceDue > 0 && po.supplierId && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Record payment"
+                        onClick={() => openPaymentDialog(po)}
+                      >
+                        <Wallet className="h-4 w-4 text-emerald-600" />
+                      </Button>
+                    )}
+                    {hasPermission('debit_note.manage') && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Return to supplier"
+                        onClick={() => setReturnTarget(po)}
+                      >
+                        <RotateCcw className="h-4 w-4 text-sky-600" />
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>New Purchase</DialogTitle>
           </DialogHeader>
@@ -403,6 +471,79 @@ export function PurchasesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CreateDebitNoteDialog purchaseOrder={returnTarget} onClose={() => setReturnTarget(null)} />
+
+      <Dialog open={!!paymentTarget} onOpenChange={(o) => !o && setPaymentTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pay Supplier — {paymentTarget?.purchaseNumber}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submitPayment} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="po-pay-amount">
+                Amount (balance due: ₹
+                {paymentTarget ? getSupplierBalanceDue(paymentTarget).toFixed(2) : '0.00'})
+              </Label>
+              <Input
+                id="po-pay-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Payment method</Label>
+              <Select
+                items={{
+                  cash: 'Cash',
+                  upi: 'UPI',
+                  card: 'Card',
+                  bank_transfer: 'Bank Transfer',
+                  cheque: 'Cheque',
+                }}
+                value={paymentMethod}
+                onValueChange={(v) => setPaymentMethod(v ?? 'cash')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPaymentTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={recordPayment.isPending}>
+                Record Payment
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <PurchaseDetailDialog
+        purchaseOrder={detailPurchase}
+        onClose={() => setDetailTargetId(null)}
+        onRecordPayment={(po) => {
+          setDetailTargetId(null)
+          openPaymentDialog(po)
+        }}
+        onReturn={(po) => {
+          setDetailTargetId(null)
+          setReturnTarget(po)
+        }}
+      />
     </div>
   )
 }

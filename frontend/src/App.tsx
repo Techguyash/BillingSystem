@@ -13,6 +13,10 @@ import { BillingPage } from '@/pages/billing-page'
 import { InvoicesPage } from '@/pages/invoices-page'
 import { ReportsPage } from '@/pages/reports-page'
 import { TeamPage } from '@/pages/team-page'
+import { ExpensesPage } from '@/pages/expenses-page'
+import { QuotationsPage } from '@/pages/quotations-page'
+import { AuditLogPage } from '@/pages/audit-log-page'
+import { ProfilePage } from '@/pages/profile-page'
 
 function App() {
   return (
@@ -23,14 +27,18 @@ function App() {
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="billing" element={<BillingPage />} />
+            <Route path="quotations" element={<QuotationsPage />} />
             <Route path="inventory" element={<ProductsPage />} />
             <Route path="purchases" element={<PurchasesPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="suppliers" element={<SuppliersPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="expenses" element={<ExpensesPage />} />
             <Route path="team" element={<TeamPage />} />
+            <Route path="audit-log" element={<AuditLogPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

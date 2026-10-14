@@ -1,5 +1,6 @@
 package com.billingsystem.business;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.business.dto.UpdateBusinessRequest;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BusinessController {
 
   private final BusinessService businessService;
+  private final AuditLogService auditLogService;
 
   @GetMapping("/me")
   public Business me() {
@@ -26,6 +28,11 @@ public class BusinessController {
   @PreAuthorize("hasAuthority('settings.manage')")
   @PatchMapping("/me")
   public Business update(@Valid @RequestBody UpdateBusinessRequest dto) {
-    return businessService.update(CurrentUser.get().getBusinessId(), dto);
+    var user = CurrentUser.get();
+    Business business = businessService.update(user.getBusinessId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "settings.update", "Business", business.getId(),
+        "Updated business settings");
+    return business;
   }
 }

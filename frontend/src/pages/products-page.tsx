@@ -4,9 +4,13 @@ import { toast } from 'sonner'
 import { PackagePlus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
-import type { Product, ProductFormValues } from '@/types/product'
+import type { Product, ProductComponentPayload, ProductFormValues } from '@/types/product'
 import { StockAdjustmentDialog } from '@/components/inventory/stock-adjustment-dialog'
+import { ProductDetailDialog } from '@/components/inventory/product-detail-dialog'
 import { DynamicCustomFields } from '@/components/settings/dynamic-custom-fields'
+import { UnitSelect } from '@/components/inventory/unit-select'
+import { TaxRateSelect } from '@/components/inventory/tax-rate-select'
+import { usePrefillSearch } from '@/lib/use-prefill-search'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,6 +30,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,12 +62,13 @@ const EMPTY_FORM: ProductFormValues = {
 
 export function ProductsPage() {
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePrefillSearch()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductFormValues>(EMPTY_FORM)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null)
+  const [detailTarget, setDetailTarget] = useState<Product | null>(null)
 
   const {
     data: products,
@@ -71,6 +84,12 @@ export function ProductsPage() {
       return res.data
     },
   })
+
+  // Candidates for a bundle's components — must themselves be simple
+  // (non-composite) products, and can't include the product being edited.
+  const componentCandidates = (products ?? []).filter(
+    (p) => p.isActive && !p.isComposite && p.id !== editing?.id,
+  )
 
   const createMutation = useMutation({
     mutationFn: (values: ProductFormValues) => api.post('/products', values),
@@ -121,9 +140,35 @@ export function ProductsPage() {
       taxRatePercent: Number(product.taxRatePercent),
       stockQty: Number(product.stockQty),
       reorderLevel: Number(product.reorderLevel),
+      isComposite: product.isComposite,
+      components: product.components.map((c) => ({
+        componentProductId: c.componentProductId,
+        quantity: Number(c.quantity),
+      })),
       customFields: product.customFields ?? {},
     })
     setDialogOpen(true)
+  }
+
+  function addComponentLine() {
+    setForm((prev) => ({
+      ...prev,
+      components: [...(prev.components ?? []), { componentProductId: '', quantity: 1 }],
+    }))
+  }
+
+  function updateComponentLine(index: number, patch: Partial<ProductComponentPayload>) {
+    setForm((prev) => ({
+      ...prev,
+      components: (prev.components ?? []).map((c, i) => (i === index ? { ...c, ...patch } : c)),
+    }))
+  }
+
+  function removeComponentLine(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      components: (prev.components ?? []).filter((_, i) => i !== index),
+    }))
   }
 
   function closeDialog() {
@@ -133,10 +178,23 @@ export function ProductsPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (form.isComposite) {
+      const validComponents = (form.components ?? []).filter((c) => c.componentProductId && c.quantity > 0)
+      if (validComponents.length === 0) {
+        toast.error('Add at least one component for this bundle')
+        return
+      }
+    }
+    const values: ProductFormValues = {
+      ...form,
+      components: form.isComposite
+        ? (form.components ?? []).filter((c) => c.componentProductId && c.quantity > 0)
+        : undefined,
+    }
     if (editing) {
-      updateMutation.mutate({ id: editing.id, values: form })
+      updateMutation.mutate({ id: editing.id, values })
     } else {
-      createMutation.mutate(form)
+      createMutation.mutate(values)
     }
   }
 
@@ -208,9 +266,18 @@ export function ProductsPage() {
                 const lowStock =
                   Number(product.stockQty) <= Number(product.reorderLevel)
                 return (
-                  <TableRow key={product.id}>
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer"
+                    onClick={() => setDetailTarget(product)}
+                  >
                     <TableCell className="font-medium">
                       {product.name}
+                      {product.isComposite && (
+                        <span className="ml-2 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-600">
+                          Bundle
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.sku || '—'}
@@ -219,28 +286,35 @@ export function ProductsPage() {
                     <TableCell>₹{Number(product.sellingPrice).toFixed(2)}</TableCell>
                     <TableCell>{Number(product.taxRatePercent)}%</TableCell>
                     <TableCell>
-                      <span
-                        className={
-                          lowStock
-                            ? 'font-semibold text-amber-600'
-                            : 'text-foreground'
-                        }
-                      >
-                        {Number(product.stockQty)}
-                      </span>
+                      {product.isComposite ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span
+                          className={
+                            lowStock
+                              ? 'font-semibold text-amber-600'
+                              : 'text-foreground'
+                          }
+                        >
+                          {Number(product.stockQty)}
+                        </span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      {!product.isComposite && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Adjust stock"
+                          onClick={() => setAdjustTarget(product)}
+                        >
+                          <PackagePlus className="h-4 w-4 text-sky-600" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Adjust stock"
-                        onClick={() => setAdjustTarget(product)}
-                      >
-                        <PackagePlus className="h-4 w-4 text-sky-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                        title="Edit product"
                         onClick={() => openEdit(product)}
                       >
                         <Pencil className="h-4 w-4" />
@@ -248,6 +322,7 @@ export function ProductsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Deactivate product"
                         onClick={() => setDeleteTarget(product)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -262,7 +337,7 @@ export function ProductsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? 'Edit Product' : 'Add Product'}
@@ -289,10 +364,10 @@ export function ProductsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unit</Label>
-                <Input
+                <UnitSelect
                   id="unit"
                   value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  onChange={(unit) => setForm({ ...form, unit })}
                 />
               </div>
             </div>
@@ -329,18 +404,10 @@ export function ProductsPage() {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="taxRatePercent">Tax %</Label>
-                <Input
+                <TaxRateSelect
                   id="taxRatePercent"
-                  type="number"
-                  step="0.01"
-                  min="0"
                   value={form.taxRatePercent}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      taxRatePercent: Number(e.target.value),
-                    })
-                  }
+                  onChange={(taxRatePercent) => setForm({ ...form, taxRatePercent })}
                 />
               </div>
               <div className="space-y-2">
@@ -350,7 +417,9 @@ export function ProductsPage() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={form.stockQty}
+                  disabled={form.isComposite}
+                  value={form.isComposite ? '' : form.stockQty}
+                  placeholder={form.isComposite ? 'Determined by components' : undefined}
                   onChange={(e) =>
                     setForm({ ...form, stockQty: Number(e.target.value) })
                   }
@@ -370,6 +439,72 @@ export function ProductsPage() {
                 />
               </div>
             </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">This is a bundle</p>
+                <p className="text-xs text-muted-foreground">
+                  Sold as one SKU, made up of other products. Selling a bundle decrements its
+                  components' stock instead of its own.
+                </p>
+              </div>
+              <Switch
+                checked={!!form.isComposite}
+                onCheckedChange={(checked) => setForm({ ...form, isComposite: checked })}
+              />
+            </div>
+
+            {form.isComposite && (
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
+                  <div className="col-span-7">Component Product</div>
+                  <div className="col-span-3">Qty per bundle</div>
+                  <div className="col-span-2"></div>
+                </div>
+                {(form.components ?? []).map((line, index) => (
+                  <div key={index} className="grid grid-cols-12 items-center gap-2">
+                    <div className="col-span-7">
+                      <Select
+                        items={Object.fromEntries(componentCandidates.map((p) => [p.id, p.name]))}
+                        value={line.componentProductId}
+                        onValueChange={(v) => updateComponentLine(index, { componentProductId: v ?? '' })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {componentCandidates.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={line.quantity}
+                        onChange={(e) =>
+                          updateComponentLine(index, { quantity: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                    <div className="col-span-2 flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeComponentLine(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addComponentLine} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> Add component
+                </Button>
+              </div>
+            )}
+
             <DynamicCustomFields
               entityType="product"
               values={form.customFields ?? {}}
@@ -413,6 +548,19 @@ export function ProductsPage() {
       <StockAdjustmentDialog
         product={adjustTarget}
         onClose={() => setAdjustTarget(null)}
+      />
+
+      <ProductDetailDialog
+        product={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onEdit={(p) => {
+          setDetailTarget(null)
+          openEdit(p)
+        }}
+        onAdjustStock={(p) => {
+          setDetailTarget(null)
+          setAdjustTarget(p)
+        }}
       />
     </div>
   )

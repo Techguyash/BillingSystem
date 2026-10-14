@@ -6,6 +6,7 @@ export interface Supplier {
   address: string | null
   gstin: string | null
   state: string | null
+  openingBalance: string
   isActive: boolean
   customFields: Record<string, unknown>
   createdAt: string
@@ -19,5 +20,6 @@ export interface SupplierFormValues {
   address?: string
   gstin?: string
   state?: string
+  openingBalance?: number
   customFields?: Record<string, unknown>
 }

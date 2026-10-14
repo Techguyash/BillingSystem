@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 import type { Supplier, SupplierFormValues } from '@/types/supplier'
 import { DynamicCustomFields } from '@/components/settings/dynamic-custom-fields'
+import { usePrefillSearch } from '@/lib/use-prefill-search'
+import { PartyDetailDialog } from '@/components/ledger/party-detail-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -50,11 +52,12 @@ function initialsOf(name: string) {
 
 export function SuppliersPage() {
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePrefillSearch()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [form, setForm] = useState<SupplierFormValues>(EMPTY_FORM)
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [ledgerTarget, setLedgerTarget] = useState<Supplier | null>(null)
 
   const {
     data: suppliers,
@@ -117,6 +120,7 @@ export function SuppliersPage() {
       address: supplier.address ?? '',
       gstin: supplier.gstin ?? '',
       state: supplier.state ?? '',
+      openingBalance: Number(supplier.openingBalance),
       customFields: supplier.customFields ?? {},
     })
     setDialogOpen(true)
@@ -199,7 +203,11 @@ export function SuppliersPage() {
                 </TableRow>
               )}
               {suppliers?.map((supplier) => (
-                <TableRow key={supplier.id}>
+                <TableRow
+                  key={supplier.id}
+                  className="cursor-pointer"
+                  onClick={() => setLedgerTarget(supplier)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <Avatar className="h-7 w-7">
@@ -219,10 +227,11 @@ export function SuppliersPage() {
                   <TableCell className="text-muted-foreground">
                     {supplier.gstin || '—'}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Edit supplier"
                       onClick={() => openEdit(supplier)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -230,6 +239,7 @@ export function SuppliersPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Deactivate supplier"
                       onClick={() => setDeleteTarget(supplier)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -243,7 +253,7 @@ export function SuppliersPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? 'Edit Supplier' : 'Add Supplier'}
@@ -305,6 +315,17 @@ export function SuppliersPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplierOpeningBalance">Opening Balance</Label>
+              <Input
+                id="supplierOpeningBalance"
+                type="number"
+                step="0.01"
+                placeholder="What the business already owed this supplier before using this system"
+                value={form.openingBalance ?? ''}
+                onChange={(e) => setForm({ ...form, openingBalance: Number(e.target.value) })}
+              />
+            </div>
             <DynamicCustomFields
               entityType="supplier"
               values={form.customFields ?? {}}
@@ -344,6 +365,19 @@ export function SuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PartyDetailDialog
+        resource="suppliers"
+        party={ledgerTarget}
+        onClose={() => setLedgerTarget(null)}
+        onEdit={(s) => {
+          setLedgerTarget(null)
+          openEdit(s)
+        }}
+        transactionType="Purchase"
+        positiveBalanceLabel="You Owe"
+        negativeBalanceLabel="In Credit"
+      />
     </div>
   )
 }

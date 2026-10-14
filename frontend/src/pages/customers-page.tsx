@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 import type { Customer, CustomerFormValues } from '@/types/customer'
 import { DynamicCustomFields } from '@/components/settings/dynamic-custom-fields'
+import { usePrefillSearch } from '@/lib/use-prefill-search'
+import { PartyDetailDialog } from '@/components/ledger/party-detail-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -50,11 +52,12 @@ function initialsOf(name: string) {
 
 export function CustomersPage() {
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePrefillSearch()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [form, setForm] = useState<CustomerFormValues>(EMPTY_FORM)
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
+  const [ledgerTarget, setLedgerTarget] = useState<Customer | null>(null)
 
   const {
     data: customers,
@@ -117,6 +120,7 @@ export function CustomersPage() {
       address: customer.address ?? '',
       gstin: customer.gstin ?? '',
       state: customer.state ?? '',
+      openingBalance: Number(customer.openingBalance),
       customFields: customer.customFields ?? {},
     })
     setDialogOpen(true)
@@ -199,7 +203,11 @@ export function CustomersPage() {
                 </TableRow>
               )}
               {customers?.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow
+                  key={customer.id}
+                  className="cursor-pointer"
+                  onClick={() => setLedgerTarget(customer)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <Avatar className="h-7 w-7">
@@ -219,10 +227,11 @@ export function CustomersPage() {
                   <TableCell className="text-muted-foreground">
                     {customer.gstin || '—'}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Edit customer"
                       onClick={() => openEdit(customer)}
                     >
                       <Pencil className="h-4 w-4" />
@@ -230,6 +239,7 @@ export function CustomersPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      title="Deactivate customer"
                       onClick={() => setDeleteTarget(customer)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -243,7 +253,7 @@ export function CustomersPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? 'Edit Customer' : 'Add Customer'}
@@ -305,6 +315,17 @@ export function CustomersPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="openingBalance">Opening Balance</Label>
+              <Input
+                id="openingBalance"
+                type="number"
+                step="0.01"
+                placeholder="What this customer already owed before using this system"
+                value={form.openingBalance ?? ''}
+                onChange={(e) => setForm({ ...form, openingBalance: Number(e.target.value) })}
+              />
+            </div>
             <DynamicCustomFields
               entityType="customer"
               values={form.customFields ?? {}}
@@ -344,6 +365,19 @@ export function CustomersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PartyDetailDialog
+        resource="customers"
+        party={ledgerTarget}
+        onClose={() => setLedgerTarget(null)}
+        onEdit={(c) => {
+          setLedgerTarget(null)
+          openEdit(c)
+        }}
+        transactionType="Invoice"
+        positiveBalanceLabel="Owes You"
+        negativeBalanceLabel="In Credit"
+      />
     </div>
   )
 }

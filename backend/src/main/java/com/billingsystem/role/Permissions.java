@@ -30,6 +30,19 @@ public final class Permissions {
   public static final String SETTINGS_MANAGE = "settings.manage";
   public static final String USER_MANAGE = "user.manage";
   public static final String ROLE_MANAGE = "role.manage";
+  // Expenses
+  public static final String EXPENSE_MANAGE = "expense.manage";
+  // Quotations/Estimates
+  public static final String QUOTATION_CREATE = "quotation.create";
+  public static final String QUOTATION_VIEW = "quotation.view";
+  // Returns
+  public static final String CREDIT_NOTE_MANAGE = "credit_note.manage";
+  public static final String DEBIT_NOTE_MANAGE = "debit_note.manage";
+  // Audit
+  public static final String AUDIT_LOG_VIEW = "audit_log.view";
+  // Discounts & tax rates
+  public static final String DISCOUNT_MANAGE = "discount.manage";
+  public static final String TAX_RATE_MANAGE = "tax_rate.manage";
 
   public static final List<String> ALL_PERMISSIONS =
       List.of(
@@ -45,7 +58,15 @@ public final class Permissions {
           REPORTS_VIEW_GST,
           SETTINGS_MANAGE,
           USER_MANAGE,
-          ROLE_MANAGE);
+          ROLE_MANAGE,
+          EXPENSE_MANAGE,
+          QUOTATION_CREATE,
+          QUOTATION_VIEW,
+          CREDIT_NOTE_MANAGE,
+          DEBIT_NOTE_MANAGE,
+          AUDIT_LOG_VIEW,
+          DISCOUNT_MANAGE,
+          TAX_RATE_MANAGE);
 
   /** Seeded default roles so a fresh install is usable immediately. */
   public static final Map<String, List<String>> DEFAULT_ROLES =
@@ -62,7 +83,20 @@ public final class Permissions {
                   CUSTOMER_MANAGE,
                   SUPPLIER_MANAGE,
                   REPORTS_VIEW,
-                  REPORTS_VIEW_GST),
+                  REPORTS_VIEW_GST,
+                  EXPENSE_MANAGE,
+                  QUOTATION_CREATE,
+                  QUOTATION_VIEW,
+                  CREDIT_NOTE_MANAGE,
+                  DEBIT_NOTE_MANAGE,
+                  DISCOUNT_MANAGE,
+                  TAX_RATE_MANAGE),
           "Cashier",
-              List.of(INVOICE_CREATE, INVOICE_VIEW, INVENTORY_VIEW, CUSTOMER_MANAGE));
+              List.of(
+                  INVOICE_CREATE,
+                  INVOICE_VIEW,
+                  INVENTORY_VIEW,
+                  CUSTOMER_MANAGE,
+                  QUOTATION_CREATE,
+                  QUOTATION_VIEW));
 }

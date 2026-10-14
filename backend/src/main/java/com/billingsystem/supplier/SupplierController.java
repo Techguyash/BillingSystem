@@ -1,6 +1,9 @@
 package com.billingsystem.supplier;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
+import com.billingsystem.ledger.LedgerEntry;
+import com.billingsystem.ledger.LedgerService;
 import com.billingsystem.supplier.dto.SupplierRequest;
 import com.billingsystem.supplier.dto.UpdateSupplierRequest;
 import jakarta.validation.Valid;
@@ -25,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class SupplierController {
 
   private final SupplierService supplierService;
+  private final LedgerService ledgerService;
+  private final AuditLogService auditLogService;
 
   @GetMapping
   public List<Supplier> findAll(@RequestParam(required = false) String search) {
@@ -36,18 +41,38 @@ public class SupplierController {
     return supplierService.findOne(CurrentUser.get().getBusinessId(), id);
   }
 
+  @GetMapping("/{id}/ledger")
+  public List<LedgerEntry> ledger(@PathVariable UUID id) {
+    return ledgerService.supplierLedger(CurrentUser.get().getBusinessId(), id);
+  }
+
   @PostMapping
   public Supplier create(@Valid @RequestBody SupplierRequest dto) {
-    return supplierService.create(CurrentUser.get().getBusinessId(), dto);
+    var user = CurrentUser.get();
+    Supplier supplier = supplierService.create(user.getBusinessId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "supplier.create", "Supplier", supplier.getId(),
+        "Created supplier \"" + supplier.getName() + "\"");
+    return supplier;
   }
 
   @PatchMapping("/{id}")
   public Supplier update(@PathVariable UUID id, @Valid @RequestBody UpdateSupplierRequest dto) {
-    return supplierService.update(CurrentUser.get().getBusinessId(), id, dto);
+    var user = CurrentUser.get();
+    Supplier supplier = supplierService.update(user.getBusinessId(), id, dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "supplier.update", "Supplier", supplier.getId(),
+        "Updated supplier \"" + supplier.getName() + "\"");
+    return supplier;
   }
 
   @DeleteMapping("/{id}")
   public void remove(@PathVariable UUID id) {
-    supplierService.remove(CurrentUser.get().getBusinessId(), id);
+    var user = CurrentUser.get();
+    Supplier supplier = supplierService.findOne(user.getBusinessId(), id);
+    supplierService.remove(user.getBusinessId(), id);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "supplier.deactivate", "Supplier", id,
+        "Deactivated supplier \"" + supplier.getName() + "\"");
   }
 }

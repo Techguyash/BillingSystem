@@ -38,6 +38,7 @@ public class SupplierService {
     supplier.setAddress(dto.getAddress());
     supplier.setGstin(dto.getGstin());
     supplier.setState(dto.getState());
+    if (dto.getOpeningBalance() != null) supplier.setOpeningBalance(dto.getOpeningBalance());
     if (dto.getCustomFields() != null) supplier.setCustomFields(dto.getCustomFields());
     return supplierRepository.save(supplier);
   }
@@ -50,6 +51,7 @@ public class SupplierService {
     if (dto.getAddress() != null) supplier.setAddress(dto.getAddress());
     if (dto.getGstin() != null) supplier.setGstin(dto.getGstin());
     if (dto.getState() != null) supplier.setState(dto.getState());
+    if (dto.getOpeningBalance() != null) supplier.setOpeningBalance(dto.getOpeningBalance());
     if (dto.getIsActive() != null) supplier.setActive(dto.getIsActive());
     if (dto.getCustomFields() != null) supplier.setCustomFields(dto.getCustomFields());
     return supplierRepository.save(supplier);

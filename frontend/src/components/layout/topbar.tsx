@@ -1,16 +1,17 @@
-import { LogOut, Search, User as UserIcon } from 'lucide-react'
+import { LogOut, User as UserIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/context/auth-context'
+import { GlobalSearch } from '@/components/layout/global-search'
 
 export function Topbar() {
   const { user, logout } = useAuth()
@@ -25,13 +26,7 @@ export function Topbar() {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
-      <div className="relative w-full max-w-sm">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search products, customers, invoices..."
-          className="pl-8"
-        />
-      </div>
+      <GlobalSearch />
       <div className="ml-auto flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 outline-none hover:bg-muted">
@@ -50,9 +45,11 @@ export function Topbar() {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
               <UserIcon className="h-4 w-4" /> Profile
             </DropdownMenuItem>
             <DropdownMenuItem

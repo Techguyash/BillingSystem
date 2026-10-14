@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Ban, Printer, Wallet } from 'lucide-react'
+import { Ban, Printer, RotateCcw, Wallet } from 'lucide-react'
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 import { getBalanceDue, type Invoice, type PaymentMethod } from '@/types/invoice'
@@ -44,6 +44,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { printReceipt } from '@/components/billing/receipt-dialog'
+import { CreateCreditNoteDialog } from '@/components/invoices/create-credit-note-dialog'
+import { InvoiceDetailDialog } from '@/components/invoices/invoice-detail-dialog'
+import { useAuth } from '@/context/auth-context'
 
 const STATUS_STYLES: Record<string, string> = {
   paid: 'brand-soft-bg brand-text',
@@ -68,12 +71,15 @@ function initialsOf(name: string) {
 
 export function InvoicesPage() {
   const queryClient = useQueryClient()
+  const { hasPermission } = useAuth()
   const [statusFilter, setStatusFilter] =
     useState<(typeof STATUS_FILTERS)[number]>('all')
   const [paymentTarget, setPaymentTarget] = useState<Invoice | null>(null)
   const [paymentAmount, setPaymentAmount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [voidTarget, setVoidTarget] = useState<Invoice | null>(null)
+  const [returnTarget, setReturnTarget] = useState<Invoice | null>(null)
+  const [detailTargetId, setDetailTargetId] = useState<string | null>(null)
 
   const {
     data: invoices,
@@ -119,6 +125,8 @@ export function InvoicesPage() {
     if (statusFilter === 'all') return invoices
     return invoices.filter((inv) => inv.status === statusFilter)
   }, [invoices, statusFilter])
+
+  const detailInvoice = invoices?.find((inv) => inv.id === detailTargetId) ?? null
 
   function openPaymentDialog(invoice: Invoice) {
     setPaymentTarget(invoice)
@@ -203,7 +211,11 @@ export function InvoicesPage() {
               {filtered.map((inv) => {
                 const balanceDue = getBalanceDue(inv)
                 return (
-                  <TableRow key={inv.id}>
+                  <TableRow
+                    key={inv.id}
+                    className="cursor-pointer"
+                    onClick={() => setDetailTargetId(inv.id)}
+                  >
                     <TableCell className="pl-6 font-medium">
                       {inv.invoiceNumber}
                     </TableCell>
@@ -239,7 +251,7 @@ export function InvoicesPage() {
                         {inv.status}
                       </span>
                     </TableCell>
-                    <TableCell className="pr-6 text-right">
+                    <TableCell className="pr-6 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -257,6 +269,16 @@ export function InvoicesPage() {
                             onClick={() => openPaymentDialog(inv)}
                           >
                             <Wallet className="h-4 w-4 text-emerald-600" />
+                          </Button>
+                        )}
+                        {inv.status !== 'void' && hasPermission('credit_note.manage') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Return items"
+                            onClick={() => setReturnTarget(inv)}
+                          >
+                            <RotateCcw className="h-4 w-4 text-sky-600" />
                           </Button>
                         )}
                         {inv.status !== 'void' && (
@@ -347,6 +369,26 @@ export function InvoicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateCreditNoteDialog invoice={returnTarget} onClose={() => setReturnTarget(null)} />
+
+      <InvoiceDetailDialog
+        invoice={detailInvoice}
+        business={business}
+        onClose={() => setDetailTargetId(null)}
+        onRecordPayment={(inv) => {
+          setDetailTargetId(null)
+          openPaymentDialog(inv)
+        }}
+        onVoid={(inv) => {
+          setDetailTargetId(null)
+          setVoidTarget(inv)
+        }}
+        onReturn={(inv) => {
+          setDetailTargetId(null)
+          setReturnTarget(inv)
+        }}
+      />
     </div>
   )
 }

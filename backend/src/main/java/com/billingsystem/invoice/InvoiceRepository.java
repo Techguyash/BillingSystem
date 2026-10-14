@@ -18,4 +18,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
   List<Invoice> findByBusinessIdAndCreatedAtBetweenAndStatusNot(
       UUID businessId, Instant from, Instant to, String excludedStatus);
+
+  List<Invoice> findTop5ByBusinessIdAndInvoiceNumberContainingIgnoreCaseOrderByCreatedAtDesc(
+      UUID businessId, String invoiceNumber);
+
+  List<Invoice> findByBusinessIdAndCustomerIdOrderByCreatedAtAsc(UUID businessId, UUID customerId);
+
+  List<Invoice> findByBusinessIdAndStatusIn(UUID businessId, List<String> statuses);
 }

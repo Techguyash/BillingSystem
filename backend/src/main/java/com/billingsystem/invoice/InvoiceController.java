@@ -1,5 +1,6 @@
 package com.billingsystem.invoice;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.invoice.dto.CreateInvoiceRequest;
 import com.billingsystem.invoice.dto.RecordPaymentRequest;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class InvoiceController {
 
   private final InvoiceService invoiceService;
+  private final AuditLogService auditLogService;
 
   @PreAuthorize("hasAuthority('invoice.view')")
   @GetMapping
@@ -39,19 +41,32 @@ public class InvoiceController {
   @PostMapping
   public Invoice create(@Valid @RequestBody CreateInvoiceRequest dto) {
     var user = CurrentUser.get();
-    return invoiceService.create(user.getBusinessId(), user.getUserId(), dto);
+    Invoice invoice = invoiceService.create(user.getBusinessId(), user.getUserId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "invoice.create", "Invoice", invoice.getId(),
+        "Created invoice " + invoice.getInvoiceNumber() + " for " + invoice.getTotalAmount());
+    return invoice;
   }
 
   @PreAuthorize("hasAuthority('invoice.void')")
   @PatchMapping("/{id}/void")
   public Invoice voidInvoice(@PathVariable UUID id) {
-    return invoiceService.voidInvoice(CurrentUser.get().getBusinessId(), id);
+    var user = CurrentUser.get();
+    Invoice invoice = invoiceService.voidInvoice(user.getBusinessId(), id);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "invoice.void", "Invoice", invoice.getId(),
+        "Voided invoice " + invoice.getInvoiceNumber());
+    return invoice;
   }
 
   @PreAuthorize("hasAuthority('invoice.create')")
   @PostMapping("/{id}/payments")
   public Invoice recordPayment(@PathVariable UUID id, @Valid @RequestBody RecordPaymentRequest dto) {
     var user = CurrentUser.get();
-    return invoiceService.recordPayment(user.getBusinessId(), id, user.getUserId(), dto);
+    Invoice invoice = invoiceService.recordPayment(user.getBusinessId(), id, user.getUserId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "invoice.payment", "Invoice", invoice.getId(),
+        "Recorded payment of " + dto.getAmount() + " (" + dto.getMethod() + ") on " + invoice.getInvoiceNumber());
+    return invoice;
   }
 }

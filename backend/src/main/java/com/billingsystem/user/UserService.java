@@ -1,5 +1,6 @@
 package com.billingsystem.user;
 
+import com.billingsystem.auth.dto.UpdateProfileRequest;
 import com.billingsystem.role.Role;
 import com.billingsystem.role.RoleService;
 import com.billingsystem.user.dto.CreateUserRequest;
@@ -77,6 +78,25 @@ public class UserService {
     }
     if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
       user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+    }
+
+    return userRepository.save(user);
+  }
+
+  /** Self-service version of {@link #update} — no role/active changes, and a password change requires proving the current one. */
+  public User updateProfile(UUID businessId, UUID userId, UpdateProfileRequest dto) {
+    User user = findOne(businessId, userId);
+
+    if (dto.getName() != null && !dto.getName().isBlank()) {
+      user.setName(dto.getName());
+    }
+
+    if (dto.getNewPassword() != null && !dto.getNewPassword().isBlank()) {
+      if (dto.getCurrentPassword() == null
+          || !passwordEncoder.matches(dto.getCurrentPassword(), user.getPasswordHash())) {
+        throw new IllegalArgumentException("Current password is incorrect");
+      }
+      user.setPasswordHash(passwordEncoder.encode(dto.getNewPassword()));
     }
 
     return userRepository.save(user);

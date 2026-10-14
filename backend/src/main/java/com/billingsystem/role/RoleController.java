@@ -1,5 +1,6 @@
 package com.billingsystem.role;
 
+import com.billingsystem.audit.AuditLogService;
 import com.billingsystem.auth.CurrentUser;
 import com.billingsystem.role.dto.RoleRequest;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoleController {
 
   private final RoleService roleService;
+  private final AuditLogService auditLogService;
 
   // Readable by anyone authenticated — the user-management form needs the
   // role list to assign one, not just settings.manage holders.
@@ -38,18 +40,33 @@ public class RoleController {
   @PreAuthorize("hasAuthority('role.manage')")
   @PostMapping
   public Role create(@Valid @RequestBody RoleRequest dto) {
-    return roleService.create(CurrentUser.get().getBusinessId(), dto);
+    var user = CurrentUser.get();
+    Role role = roleService.create(user.getBusinessId(), dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "role.create", "Role", role.getId(),
+        "Created role \"" + role.getName() + "\"");
+    return role;
   }
 
   @PreAuthorize("hasAuthority('role.manage')")
   @PatchMapping("/{id}")
   public Role update(@PathVariable UUID id, @Valid @RequestBody RoleRequest dto) {
-    return roleService.update(CurrentUser.get().getBusinessId(), id, dto);
+    var user = CurrentUser.get();
+    Role role = roleService.update(user.getBusinessId(), id, dto);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "role.update", "Role", role.getId(),
+        "Updated role \"" + role.getName() + "\"");
+    return role;
   }
 
   @PreAuthorize("hasAuthority('role.manage')")
   @DeleteMapping("/{id}")
   public void remove(@PathVariable UUID id) {
-    roleService.remove(CurrentUser.get().getBusinessId(), id);
+    var user = CurrentUser.get();
+    Role role = roleService.findOne(user.getBusinessId(), id);
+    roleService.remove(user.getBusinessId(), id);
+    auditLogService.record(
+        user.getBusinessId(), user.getUserId(), user.getName(), "role.delete", "Role", id,
+        "Deleted role \"" + role.getName() + "\"");
   }
 }

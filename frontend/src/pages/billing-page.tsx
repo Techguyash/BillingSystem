@@ -19,6 +19,7 @@ import type { Product } from '@/types/product'
 import type { Customer } from '@/types/customer'
 import type { CreateInvoicePayload, Invoice, PaymentMethod } from '@/types/invoice'
 import type { Business } from '@/types/business'
+import type { Discount } from '@/types/discount'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,6 +33,16 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { ReceiptDialog } from '@/components/billing/receipt-dialog'
 import { CustomerCombobox } from '@/components/billing/customer-combobox'
@@ -86,10 +97,15 @@ export function BillingPage() {
   const [cart, setCart] = useState<CartLine[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
-  const [discount, setDiscount] = useState(0)
+  // Manual ad-hoc discount (₹ or %), used when no preset is selected.
+  const [manualDiscountType, setManualDiscountType] = useState<'PERCENTAGE' | 'FIXED'>('FIXED')
+  const [manualDiscountValue, setManualDiscountValue] = useState(0)
+  // A named preset from Settings → Discounts, selected from the dropdown.
+  const [selectedDiscountId, setSelectedDiscountId] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([])
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const {
     data: products,
@@ -120,6 +136,11 @@ export function BillingPage() {
     queryFn: async () => (await api.get<Business>('/business/me')).data,
   })
 
+  const { data: activeDiscounts } = useQuery({
+    queryKey: ['discounts', 'active'],
+    queryFn: async () => (await api.get<Discount[]>('/discounts/active')).data,
+  })
+
   const createInvoice = useMutation({
     mutationFn: (payload: CreateInvoicePayload) =>
       api.post<Invoice>('/invoices', payload).then((r) => r.data),
@@ -129,7 +150,9 @@ export function BillingPage() {
       setCart([])
       setSelectedCustomer(null)
       setPaymentMethod('cash')
-      setDiscount(0)
+      setManualDiscountType('FIXED')
+      setManualDiscountValue(0)
+      setSelectedDiscountId(null)
       setNotes('')
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['reports', 'summary'] })
@@ -164,6 +187,8 @@ export function BillingPage() {
     setCart((prev) => prev.filter((l) => l.product.id !== productId))
   }
 
+  const selectedDiscount = activeDiscounts?.find((d) => d.id === selectedDiscountId) ?? null
+
   const totals = useMemo(() => {
     let subtotal = 0
     let taxTotal = 0
@@ -174,12 +199,44 @@ export function BillingPage() {
       subtotal += lineSubtotal
       taxTotal += (lineSubtotal * taxRate) / 100
     }
-    const total = Math.max(subtotal + taxTotal - discount, 0)
-    return { subtotal, taxTotal, total }
-  }, [cart, discount])
+    const preDiscountTotal = subtotal + taxTotal
 
-  function handleCheckout() {
+    let discountAmount = 0
+    let discountMeetsMinimum = true
+    if (selectedDiscount) {
+      const minOrder = selectedDiscount.minOrderAmount ? Number(selectedDiscount.minOrderAmount) : 0
+      discountMeetsMinimum = preDiscountTotal >= minOrder
+      if (discountMeetsMinimum) {
+        discountAmount =
+          selectedDiscount.type === 'PERCENTAGE'
+            ? (preDiscountTotal * Number(selectedDiscount.value)) / 100
+            : Number(selectedDiscount.value)
+      }
+    } else if (manualDiscountValue > 0) {
+      discountAmount =
+        manualDiscountType === 'PERCENTAGE'
+          ? (preDiscountTotal * manualDiscountValue) / 100
+          : manualDiscountValue
+    }
+    discountAmount = Math.min(discountAmount, preDiscountTotal)
+
+    const total = Math.max(preDiscountTotal - discountAmount, 0)
+    return { subtotal, taxTotal, discountAmount, discountMeetsMinimum, total }
+  }, [cart, selectedDiscount, manualDiscountType, manualDiscountValue])
+
+  function openCheckoutConfirm() {
     if (cart.length === 0) return
+    if (selectedDiscount && !totals.discountMeetsMinimum) {
+      toast.error(
+        `"${selectedDiscount.name}" requires a minimum order of ₹${Number(selectedDiscount.minOrderAmount).toFixed(2)}`,
+      )
+      return
+    }
+    setConfirmOpen(true)
+  }
+
+  function confirmCheckout() {
+    setConfirmOpen(false)
     createInvoice.mutate({
       customerId: selectedCustomer?.id,
       items: cart.map((l) => ({
@@ -187,7 +244,8 @@ export function BillingPage() {
         quantity: l.quantity,
       })),
       paymentMethod,
-      discountTotal: discount || undefined,
+      discountId: selectedDiscount ? selectedDiscount.id : undefined,
+      discountTotal: !selectedDiscount && totals.discountAmount > 0 ? totals.discountAmount : undefined,
       notes: notes || undefined,
     })
   }
@@ -504,43 +562,101 @@ export function BillingPage() {
 
             <Separator />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Discount (₹)
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={discount || ''}
-                  onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Payment method
-                </label>
-                <Select
-                  items={PAYMENT_METHOD_ITEMS}
-                  value={paymentMethod}
-                  onValueChange={(v) =>
-                    setPaymentMethod((v as PaymentMethod) ?? 'cash')
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                Discount
+              </label>
+              <Select
+                items={{
+                  none: 'No preset — enter manually',
+                  ...Object.fromEntries((activeDiscounts ?? []).map((d) => [d.id, d.name])),
+                }}
+                value={selectedDiscountId ?? 'none'}
+                onValueChange={(v) => setSelectedDiscountId(v === 'none' ? null : (v ?? null))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No preset — enter manually</SelectItem>
+                  {activeDiscounts?.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name} (
+                      {d.type === 'PERCENTAGE' ? `${Number(d.value)}%` : `₹${Number(d.value).toFixed(2)}`}
+                      {d.minOrderAmount ? ` above ₹${Number(d.minOrderAmount).toFixed(2)}` : ''})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDiscount && !totals.discountMeetsMinimum && (
+                <p className="mt-1 text-xs font-medium text-amber-600">
+                  Needs a minimum order of ₹{Number(selectedDiscount.minOrderAmount).toFixed(2)} to apply.
+                </p>
+              )}
+
+              {!selectedDiscount && (
+                <div className="mt-2 flex gap-2">
+                  <div className="flex rounded-md border border-border p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setManualDiscountType('FIXED')}
+                      className={cn(
+                        'rounded px-2.5 py-1 text-xs font-semibold',
+                        manualDiscountType === 'FIXED'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground',
+                      )}
+                    >
+                      ₹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualDiscountType('PERCENTAGE')}
+                      className={cn(
+                        'rounded px-2.5 py-1 text-xs font-semibold',
+                        manualDiscountType === 'PERCENTAGE'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground',
+                      )}
+                    >
+                      %
+                    </button>
+                  </div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    max={manualDiscountType === 'PERCENTAGE' ? 100 : undefined}
+                    value={manualDiscountValue || ''}
+                    onChange={(e) => setManualDiscountValue(Number(e.target.value) || 0)}
+                    placeholder={manualDiscountType === 'PERCENTAGE' ? '0%' : '0.00'}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                Payment method
+              </label>
+              <Select
+                items={PAYMENT_METHOD_ITEMS}
+                value={paymentMethod}
+                onValueChange={(v) =>
+                  setPaymentMethod((v as PaymentMethod) ?? 'cash')
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -564,10 +680,10 @@ export function BillingPage() {
                 <span>Tax</span>
                 <span>₹{totals.taxTotal.toFixed(2)}</span>
               </div>
-              {discount > 0 && (
+              {totals.discountAmount > 0 && (
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Discount</span>
-                  <span>-₹{discount.toFixed(2)}</span>
+                  <span>Discount{selectedDiscount ? ` (${selectedDiscount.name})` : ''}</span>
+                  <span>-₹{totals.discountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-bold text-foreground">
@@ -588,8 +704,12 @@ export function BillingPage() {
               <Button
                 size="lg"
                 className="flex-1"
-                disabled={cart.length === 0 || createInvoice.isPending}
-                onClick={handleCheckout}
+                disabled={
+                  cart.length === 0 ||
+                  createInvoice.isPending ||
+                  (!!selectedDiscount && !totals.discountMeetsMinimum)
+                }
+                onClick={openCheckoutConfirm}
               >
                 {createInvoice.isPending
                   ? 'Processing...'
@@ -615,6 +735,74 @@ export function BillingPage() {
         business={business}
         onClose={() => setReceiptInvoice(null)}
       />
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Sale</AlertDialogTitle>
+            <AlertDialogDescription>
+              Review the order before charging the customer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 text-left text-sm text-muted-foreground">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Customer</span>
+                <span className="font-medium text-foreground">
+                  {selectedCustomer?.name ?? 'Walk-in customer'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Items</span>
+                <span className="font-medium text-foreground">
+                  {cart.reduce((sum, l) => sum + l.quantity, 0)} ({cart.length} product
+                  {cart.length === 1 ? '' : 's'})
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment method</span>
+                <span className="font-medium text-foreground">
+                  {PAYMENT_METHOD_ITEMS[paymentMethod]}
+                </span>
+              </div>
+            </div>
+            <Separator />
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>₹{totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>₹{totals.taxTotal.toFixed(2)}</span>
+              </div>
+              {totals.discountAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>Discount{selectedDiscount ? ` (${selectedDiscount.name})` : ''}</span>
+                  <span>-₹{totals.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold text-foreground">
+                <span>Total</span>
+                <span>₹{totals.total.toFixed(2)}</span>
+              </div>
+            </div>
+            {paymentMethod === 'credit' && (
+              <p className="text-amber-600">
+                This will be recorded as credit — no payment collected now.
+              </p>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCheckout} disabled={createInvoice.isPending}>
+              {createInvoice.isPending ? 'Processing...' : `Confirm & Charge ₹${totals.total.toFixed(2)}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
